@@ -19,7 +19,7 @@
 ---
 
 <p align="center"> 
-    <br> Tutorial of Spark.
+    <br> Tutorial of Spark. 
 </p>
 
 ## 📝 Table of Contents
@@ -29,9 +29,11 @@
 
 ## 🏁 Getting Started <a name = "getting_started"></a>
 
-This document explains how to install Spark and how to basic use it.
+* This document explains how to install Spark and how to basic use it.
 
-### Tutorial
+* This document has been created with reference to the book `Spark The Definitive Guide`.
+
+### **Tutorial**
 
 1. **Run Jupyter Notebook docker including Spark.**
 
@@ -190,15 +192,144 @@ This document explains how to install Spark and how to basic use it.
         only showing top 5 rows
         ```
 
-1. **Prepare to use DataFrame with SQL.**
-
-    * This code register your dataframe to table.
+1. **Get data using select function.**
 
     ```python
-    df.createOrReplaceTempView("country")
+    from pyspark.sql.functions import *
+    df.select(col("DEST_COUNTRY_NAME")).show(2)
     ```
 
+    * result:
 
+        ```
+        +-----------------+
+        |DEST_COUNTRY_NAME|
+        +-----------------+
+        |    United States|
+        |    United States|
+        +-----------------+
+        only showing top 2 rows    
+        ```
+
+1. **Get data using SQL from DataFrame.**
+
+    ```python
+    # This code register your dataframe to table.
+    df.createOrReplaceTempView("country")
+    spark.sql("SELECT * FROM country").show(2)
+    ```
+
+    * result:
+
+        ```bash
+        +-----------------+-------------------+-----+
+        |DEST_COUNTRY_NAME|ORIGIN_COUNTRY_NAME|count|
+        +-----------------+-------------------+-----+
+        |    United States|            Romania|   15|
+        |    United States|            Croatia|    1|
+        +-----------------+-------------------+-----+
+        only showing top 2 rows
+        ```
+
+1. **Add Column**
+
+    ```bash
+    df = df.withColumn("number_one", lit(1))
+    df.show(5)
+    ```
+
+    * result:
+
+        ```
+        +-----------------+-------------------+-----+----------+
+        |DEST_COUNTRY_NAME|ORIGIN_COUNTRY_NAME|count|number_one|
+        +-----------------+-------------------+-----+----------+
+        |    United States|            Romania|   15|         1|
+        |    United States|            Croatia|    1|         1|
+        |    United States|            Ireland|  344|         1|
+        |            Egypt|      United States|   15|         1|
+        |    United States|              India|   62|         1|
+        +-----------------+-------------------+-----+----------+
+        only showing top 5 rows
+        ```
+
+1. **Rename Column**
+
+    ```python
+    df.withColumnRenamed("DEST_COUNTRY_NAME", "dest").columns
+    ```
+
+    * result:
+
+        ```
+        ['dest', 'ORIGIN_COUNTRY_NAME', 'count', 'number_one']
+        ```
+
+1. **Drop Column**
+
+    ```python
+    df.drop("DEST_COUNTRY_NAME").columns
+    ```
+
+    * result:
+
+        ```
+        ['ORIGIN_COUNTRY_NAME', 'count', 'number_one']
+        ```
+
+
+1. **Cast Column Data Type**
+
+    ```python
+    df.withColumn("count", col("count").cast("string")).printSchema()
+    ```
+
+    * result:
+
+        ```
+        root
+        |-- DEST_COUNTRY_NAME: string (nullable = true)
+        |-- ORIGIN_COUNTRY_NAME: string (nullable = true)
+        |-- count: string (nullable = true)
+        |-- number_one: integer (nullable = false)
+        ```
+
+1. **Split Dataframe randomly**
+
+    ```python
+    temp_df = df.randomSplit([0.25, 0.75])
+
+    temp_df[0].count(), temp_df[1].count()
+    ```
+
+    * result:
+
+        ```
+        (69, 187)
+        ```
+
+1. **Append Rows**
+
+    Dataframe has immutability. So we will create a new DataFrame with new rows and merge them.
+
+    ```python
+    from pyspark.sql import Row
+
+    new_rows = [
+        Row("New Country", "Other Country", 5, 1),
+        Row("New Country 2", "Other Country 3", 1, 1)
+    ]
+
+    new_df = spark.createDataFrame(new_rows, df.schema)
+
+    df.union(new_df).count(), df.count()    
+    ```
+
+    * result:
+
+        ```
+        (258, 256)
+        ```
 
 ### Reference
 
