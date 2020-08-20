@@ -39,11 +39,21 @@
 
     * `4040` port is for `spark UI`.
     * `8080` port is for `Jupyter Lab`.
+
+
+    `Linux: `
     ```bash
     docker run -d -v $pwd/workspace:/workspace -p 8888:8888 -p 4040:4040 -it --rm --name lab dahuin000/lab
 
     docker logs -f lab
     ```
+
+    `Windows`
+    ```bash
+    docker run -d -v %cd%/workspace:/workspace -p 8888:8888 -p 4040:4040 -it --rm --name lab dahuin000/lab
+
+    docker logs -f lab
+    ```    
 
 1. **Copy URL in logs and connect your jupyterlab**
 
@@ -216,7 +226,7 @@
     ```python
     # This code register your dataframe to table.
     df.createOrReplaceTempView("country")
-    spark.sql("SELECT * FROM country").show(2)
+    spark.sql("SELECT * FROM country").limit(2).show()
     ```
 
     * result:
@@ -233,9 +243,9 @@
 
 1. **Add Column**
 
-    ```bash
+    ```
     df = df.withColumn("number_one", lit(1))
-    df.show(5)
+    df.limit(5).show()
     ```
 
     * result:
@@ -329,6 +339,250 @@
 
         ```
         (258, 256)
+        ```
+
+1. **Sort Rows**
+
+    ```python
+    df.orderBy(col("DEST_COUNTRY_NAME")).limit(5).show()
+    df.orderBy(col("count"), col("DEST_COUNTRY_NAME")).limit(5).show()
+    ```
+
+    * result:
+
+        ```
+        +-------------------+-------------------+-----+----------+
+        |  DEST_COUNTRY_NAME|ORIGIN_COUNTRY_NAME|count|number_one|
+        +-------------------+-------------------+-----+----------+
+        |            Algeria|      United States|    4|         1|
+        |             Angola|      United States|   15|         1|
+        |           Anguilla|      United States|   41|         1|
+        |Antigua and Barbuda|      United States|  126|         1|
+        |          Argentina|      United States|  180|         1|
+        +-------------------+-------------------+-----+----------+
+        only showing top 5 rows
+
+        +-----------------+-------------------+-----+----------+
+        |DEST_COUNTRY_NAME|ORIGIN_COUNTRY_NAME|count|number_one|
+        +-----------------+-------------------+-----+----------+
+        |     Burkina Faso|      United States|    1|         1|
+        |    Cote d'Ivoire|      United States|    1|         1|
+        |           Cyprus|      United States|    1|         1|
+        |         Djibouti|      United States|    1|         1|
+        |        Indonesia|      United States|    1|         1|
+        +-----------------+-------------------+-----+----------+
+        only showing top 5 rows
+        ```    
+
+1. **Repartition**
+
+    `Partiton`
+    * Each executor can execute on task per each core, and one partition is linked to one task.
+    * Too many partitions incur overhead.
+    * One Spark executor == One YARN container
+
+    ![](./static/20200820_112732.png)
+
+    ```py
+    df.repartition(5)
+    df.repartition(col("DEST_COUNTRY_NAME"))
+    ```
+
+1. **Collect Row Data to Driver**
+
+    ```py
+    df.take(5)
+    df.collect() # caution!
+    ```
+
+1. **Cache**
+
+    * Cache in memory
+
+    ```py
+    df.cache()
+    ```
+
+1. **Alias**
+
+    ```py
+    df.select(col("count").alias("number")).limit(5).show()
+    ```
+
+    * result:
+        ```
+        +------+
+        |number|
+        +------+
+        |    15|
+        |     1|
+        |   344|
+        |    15|
+        |    62|
+        +------+
+        ```
+
+1. **Count (Aggregation)**
+
+    * This count is transformation. It works only when action is executed.
+
+    ```py
+    df.select(count("*")).show()
+    df.select(countDistinct("ORIGIN_COUNTRY_NAME")).show()
+    ```
+
+    * result:
+        ```
+        +--------+
+        |count(1)|
+        +--------+
+        |     256|
+        +--------+
+        +-----------------------------------+
+        |count(DISTINCT ORIGIN_COUNTRY_NAME)|
+        +-----------------------------------+
+        |                                125|
+        +-----------------------------------+
+        ```
+
+1. **First and Last (Aggregation)**
+    
+    ```py
+    odf = df.sort("ORIGIN_COUNTRY_NAME")
+    odf.select(first("ORIGIN_COUNTRY_NAME"), last("ORIGIN_COUNTRY_NAME")).show()
+    ```
+
+    * result:
+        ```
+        +---------------------------------+--------------------------------+
+        |first(ORIGIN_COUNTRY_NAME, false)|last(ORIGIN_COUNTRY_NAME, false)|
+        +---------------------------------+--------------------------------+
+        |                           Angola|                         Vietnam|
+        +---------------------------------+--------------------------------+
+        ```
+
+1. **Min and Max (Aggregation)**
+
+    ```py
+    odf.select(min("count"), max("count")).show()
+    ```
+
+    * result:
+        ```
+        +----------+----------+
+        |min(count)|max(count)|
+        +----------+----------+
+        |         1|    370002|
+        +----------+----------+        
+        ```
+
+1. **Sum (Aggregation)**
+
+    ```py
+    odf.select(sum("count")).show()
+    sum("count")
+    ```
+
+    * result:
+        ```
+        +----------+
+        |sum(count)|
+        +----------+
+        |    453316|
+        +----------+       
+        Column<b'sum(count)'>
+        ```
+
+1. **Avg (Aggregation)**
+
+    ```py
+    odf.select(avg("count")).show()
+    ```
+
+    * result:
+        ```
+        +-----------+
+        | avg(count)|
+        +-----------+
+        |1770.765625|
+        +-----------+
+        ```
+
+1. **Group By (Aggregation)**
+
+    ```py
+    ddf = df.groupBy("DEST_COUNTRY_NAME").agg(count("*").alias("count"), sum("count").alias("sum"))
+    ddf.orderBy(desc("count")).show()    
+    ```
+
+    * result:
+        ```
+        +--------------------+-----+------+
+        |   DEST_COUNTRY_NAME|count|   sum|
+        +--------------------+-----+------+
+        |       United States|  125|411352|
+        |              Kosovo|    1|     1|
+        |              Sweden|    1|   118|
+        |            Anguilla|    1|    41|
+        |              Russia|    1|   176|
+        |            Paraguay|    1|    60|
+        |            Kiribati|    1|    26|
+        |              Guyana|    1|    64|
+        |            Djibouti|    1|     1|
+        |         Philippines|    1|   134|
+        |            Malaysia|    1|     2|
+        |           Singapore|    1|     3|
+        |              Turkey|    1|   138|
+        |                Iraq|    1|     1|
+        |                Fiji|    1|    24|
+        |             Germany|    1|  1468|
+        |               Palau|    1|    30|
+        |Turks and Caicos ...|    1|   230|
+        |              France|    1|   935|
+        |              Jordan|    1|    44|
+        +--------------------+-----+------+        
+        ```
+
+1. **Join**
+
+    1. Create join expression
+    ```py
+    person = spark.createDataFrame([
+        (0, "Bill Chambers", 0, [100]),
+        (1, "Matei Zaharia", 1, [500, 250, 100]),
+        (2, "Michael Armbrust", 1, [250, 100])
+    ]).toDF("id", "name", "graduate_program", "spark_status")
+
+    graduate_program = spark.createDataFrame([
+        (0, "Masters", "School of Information", "UC Berkeley"),
+        (2, "Masters", "EECS", "UC Berkeley"),
+        (1, "Ph.D", "EECS", "UC Berkeley"),
+    ]).toDF("id", "degree", "department"," school")
+
+    join_expression = person["graduate_program"] == graduate_program["id"]
+    join_expression
+    ```
+
+    * result:
+        ```
+        Column<b'(graduate_program = id)'>
+        ```
+
+    1. Join
+
+    ```py
+    person.join(graduate_program, join_expression, "inner").select("name", "degree", "department").show()
+    ```
+
+    * result:
+        ```bash
+        +----------------+-------+--------------------+
+        |            name| degree|          department|
+        +----------------+-------+--------------------+
+        |   Bill Chambers|Masters|School of Informa...|
+        |   Matei Zaharia|   Ph.D|                EECS|
+        |Michael Armbrust|   Ph.D|                EECS|
+        +----------------+-------+--------------------+
         ```
 
 ### Reference
